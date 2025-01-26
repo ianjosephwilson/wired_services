@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+
+[project]
+name = "wired_services"
+dynamic = ["version"]
+license = {text = "MIT"}
+dependencies = [
+    "wired",
+]
+description = ""
+
+[tool.hatch]
+
+[tool.hatch.version]
+path = "src/wired_services/__version__.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src/wired_services",
+]
+
+# @TODO
+[tool.hatch.envs.testing]
+skip-install=false
+dependencies=[
+]
+template = "testing"
+
+# @TODO
+[tool.hatch.envs.docs]
+skip-install = true
+dependencies = [
+]
+template = "docs"
+
+
+[tool.hatch.envs.docs.scripts]
+
+
+[tool.hatch.envs.default]
+# This is for working natively in the repo.
+skip-install = false
+dependencies = [
+    # Linter
+    "flake8",
+    # Code formatter
+    "black",
+    # Extension to find bugs when running linter.
+    "flake8-bugbear",
+    # Manages pre commits like black/flake8.
+    "pre-commit",
+]
+
+
+[tool.hatch.envs.default.scripts]
+# Re-install precommit hooks if we changed hatch VE.
+pre-commit-install="pre-commit install"
+# Tag current revision and push tag to origin.
+tag=[
+    "git tag -a v`hatch version` -m Version' '`hatch version`",
+    "git push origin v`hatch version`"
+]
+bump-changelog="python changelogger.py {root}/CHANGELOG.rst v`hatch version`"
