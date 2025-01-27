@@ -10,15 +10,15 @@ Default handling
   to be a common case, ie. get this setting unless it is missing then use this default.
 - I'm not convinced using it for getattr is actually a good idea either though.
 """
-from dataclasses import dataclass, is_dataclass, field
-from typing import Any, get_origin, get_args, Annotated, get_type_hints
+from dataclasses import dataclass, is_dataclass, field, replace
+from typing import Any, get_origin, get_args, Annotated, get_type_hints, TypeVar, Type, Callable
 from inspect import get_annotations, isclass
 from venusian import attach as venusian_attach
-from .protocols import DependencyResolverProtocol
+from .protocols import DependencyResolverProtocol, DependencyExtractorProtocol, WiredMarkerProtocol
 
 
 @dataclass
-class Wired:
+class Wired(WiredMarkerProtocol):
     iface: Any|None = None
     name: str|None = None
     context: Any|None = None
@@ -29,9 +29,9 @@ class Wired:
 
 
 @dataclass
-class AnnotatedDependencyResolver:
+class AnnotatedDependencyExtractor:
     """
-    Resolve dependencies from annotations of service factory.
+    Extract dependency specifications from annotations of service factory.
 
     spec_class:
         The class to use to specify where/how to load a dependency within Annotated.
@@ -43,19 +43,17 @@ class AnnotatedDependencyResolver:
         # Wired as if the specification was Annotated[iface, Wired()].
         return self.spec_class()
 
-    def resolve_dependencies(self, service_factory, container):
+    def extract(self, service_factory: Any) -> dict[str, Wired]:
         """
         Resolve dependencies that should be injected into the service's factory.
 
         service_factory: callable
-          The factory we extract the dependency specifications from to resolve the dependencies.
-        container:
-          Wired container to get actual services from.
+          The factory we extract the dependency specifications from.
 
-        return: dict[str, Any]
-          Return a mapping from arg/property to resolved dependency.
+        return: dict[str, Wired]
+          Return a mapping from arg/property to resolved dependency spec.
         """
-        deps = {}
+        dep_specs = {}
         hints = get_type_hints(service_factory, include_extras=True)
         for k, hint in hints.items():
             origin = get_origin(hint)
@@ -72,21 +70,31 @@ class AnnotatedDependencyResolver:
                         spec = self.create_empty_spec()
 
                     if spec:
-                        # Override hint's type if spec provides alternative iface.
-                        if spec.iface is not None:
-                            iface = spec.iface
-                        result = container.get(iface, name=spec.name or '')
-                        # Interact with the service to get the final dependency if needed.
-                        if spec.attr:
-                            result = getattr(result, spec.attr)
-                        if spec.key:
-                            result = result[spec.key]
-                        if spec.call_kwargs or spec.call_args:
-                            call_kwargs = spec.call_kwargs or {}
-                            call_args = spec.call_args or ()
-                            result = result(*call_args, **call_kwargs)
-                        deps[k] = result
+                        if spec.iface is None:
+                            # Use hint type if spec does not define one.
+                            spec = replace(spec, iface=iface)
+                        dep_specs[k] = spec
+        return dep_specs
+
+
+class AnnotatedDependencyResolver:
+
+    def resolve(self, container: Any, dep_specs: dict[str, Wired]) -> dict[str, Any]:
+        deps = {}
+        for k, spec in dep_specs.items():
+            result = container.get(spec.iface, name=spec.name or '')
+            # Interact with the service to get the final dependency if needed.
+            if spec.attr:
+                result = getattr(result, spec.attr)
+            if spec.key:
+                result = result[spec.key]
+            if spec.call_kwargs or spec.call_args:
+                call_kwargs = spec.call_kwargs or {}
+                call_args = spec.call_args or ()
+                result = result(*call_args, **call_kwargs)
+            deps[k] = result
         return deps
+
 
 T = TypeVar('T')
 
@@ -110,15 +118,18 @@ class Injector:
 
     service_factory: Type[T]|Callable[...,T]
     factory_kwargs: dict[str, Any] = field(default_factory=dict)
+    extractor: DependencyExtractorProtocol = field(default_factory=AnnotatedDependencyExtractor)
     resolver: DependencyResolverProtocol = field(default_factory=AnnotatedDependencyResolver)
 
     def __call__(self, container) -> T:
+        dep_specs = self.extractor.extract(
+            self.service_factory
+        )
+        deps = self.resolver.resolve(container, dep_specs)
         return self.service_factory(
             **dict(
                 self.factory_kwargs,
-                **self.resolver.resolve_dependencies(
-                    self.service_factory, container
-                ),
+                **deps,
             )
         )
 
@@ -128,7 +139,7 @@ def wired_service(
     context=None,
     name="",
     category="wired_service",
-    injector_factory=Injecter,
+    injector_factory=Injector,
     **injector_factory_kwargs,
 ):
     """

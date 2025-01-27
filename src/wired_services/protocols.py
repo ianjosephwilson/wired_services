@@ -3,7 +3,17 @@ from wired import ServiceContainer
 from typing import Callable, Any
 
 
+class WiredMarkerProtocol(Protocol):
+    pass
+
+
+class DependencyExtractorProtocol(Protocol):
+
+    def extract(self, service_factory: Callable) -> dict[str, WiredMarkerProtocol]:
+        return {}
+
+
 class DependencyResolverProtocol(Protocol):
 
-    def resolve_dependencies(self, service_factory: Callable, container: ServiceContainer) -> dict[str, Any]:
+    def resolve(self, dep_specs: dict[str, WiredMarkerProtocol], container: ServiceContainer) -> dict[str, Any]:
         return {}
