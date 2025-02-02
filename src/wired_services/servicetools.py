@@ -77,7 +77,7 @@ class AnnotatedDependencyExtractor:
         return dep_specs
 
 
-class AnnotatedDependencyResolver:
+class DependencyResolver:
 
     def resolve(self, container: Any, dep_specs: dict[str, Wired]) -> dict[str, Any]:
         deps = {}
@@ -119,7 +119,7 @@ class Injector:
     service_factory: Type[T]|Callable[...,T]
     factory_kwargs: dict[str, Any] = field(default_factory=dict)
     extractor: DependencyExtractorProtocol = field(default_factory=AnnotatedDependencyExtractor)
-    resolver: DependencyResolverProtocol = field(default_factory=AnnotatedDependencyResolver)
+    resolver: DependencyResolverProtocol = field(default_factory=DependencyResolver)
 
     def __call__(self, container) -> T:
         dep_specs = self.extractor.extract(
