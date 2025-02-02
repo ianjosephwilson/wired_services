@@ -15,5 +15,5 @@ class DependencyExtractorProtocol(Protocol):
 
 class DependencyResolverProtocol(Protocol):
 
-    def resolve(self, dep_specs: dict[str, WiredMarkerProtocol], container: ServiceContainer) -> dict[str, Any]:
+    def resolve(self, container: ServiceContainer, dep_specs: dict[str, WiredMarkerProtocol]) -> dict[str, Any]:
         return {}

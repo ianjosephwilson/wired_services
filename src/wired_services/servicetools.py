@@ -79,7 +79,7 @@ class AnnotatedDependencyExtractor:
 
 class DependencyResolver:
 
-    def resolve(self, container: Any, dep_specs: dict[str, Wired]) -> dict[str, Any]:
+    def resolve(self, container: Any, dep_specs: dict[str, WiredMarkerProtocol]) -> dict[str, Any]:
         deps = {}
         for k, spec in dep_specs.items():
             result = container.get(spec.iface, name=spec.name or '')
