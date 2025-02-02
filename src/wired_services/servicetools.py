@@ -61,7 +61,7 @@ class AnnotatedDependencyExtractor:
                 a_args = get_args(hint)
                 iface = a_args[0]
                 for a_arg in a_args[1:]:
-                    spec = None
+                    spec: Wired|None = None
                     if isinstance(a_arg, self.spec_class):
                         # ie. Annotated[IFace, Wired(...)] or Annotated[IFace, Wired()]
                         spec = a_arg
